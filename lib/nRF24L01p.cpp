@@ -267,23 +267,24 @@ void NRF24L01p::txData(unsigned char DATA [], int BYTE_NUM)
 	//Serial.println("DATA"); //DEBUG
 	while (ind < BYTE_NUM)
 	{
+		/*
 		//DEBUG
-		//Serial.print("Element ");
-		//Serial.print(ind);
-		//Serial.print(": ");
-		//Serial.println(DATA[ind]);
-		
+		printString("Element ");
+		printWord(ind);
+		printString(": ");
+		printWord(DATA[ind]);
+		*/
 		SPI_tradeByte(DATA[ind]);
 		ind = ind+1;
+		
 	}
 	//digitalWrite(csn_pin, HIGH);
 	SPI_CSN_PORT |= (1 << SPI_CSN);                       /* Write CSN pin HIGH */
-	
+	_delay_ms(2); 
 	// When sending packets, the CE pin (which is normally held low in TX operation) is set to high for a minimum of 10us to send the packet.
 	//digitalWrite(ce_pin, HIGH);
 	SPI_CE_PORT |= (1 << SPI_CE);                          /* Write CE pin HIGH */
-	_delay_ms(10); 
-	printString("Data sent from myRadio.txData\r\n");
+	_delay_ms(1); 
 	//digitalWrite(ce_pin, LOW);
 	SPI_CE_PORT &= ~(1 << SPI_CE);                         /* Write CE pin low */
 	

@@ -59,7 +59,7 @@ void setup(void)
 	// Setup data pipes, addresses etc
 	//
 	// Use default addresses for now _ CHANGE ADDRESSES HERE IN FUTURE
-	unsigned char pipesOn [] = {0x03}; // which pipes to turn on for receiving
+	unsigned char pipesOn [] = {0x01}; // which pipes to turn on for receiving
 	//unsigned char fixedPayloadWidth [] = {0x05}; // number of bytes for payload width
 	int fixedPayloadWidth = 2; // number of bytes for payload width
 	myRadio.setup_data_pipes(pipesOn, fixedPayloadWidth);
@@ -67,7 +67,6 @@ void setup(void)
 	//DEBUG - change RX_ADDR_P0 to see if I am reading the right value
 	unsigned char tmpArr [] = {0xE7,0xE7,0xE7,0xE7,0xE7};
 	myRadio.writeRegister(RX_ADDR_P0,tmpArr, 5);
-	
 	
 	// Configure radio to be TX (transmitter) or RX (receiver)
 	printString("Configure Radio\r\n");
@@ -98,9 +97,26 @@ void setup(void)
 	_delay_ms(100); // Make sure all the configuration is completed before attaching the interrupt
 	//attachInterrupt(0, IRQ_resolve, FALLING);
   // The nRF24L01p chip should pullup the pin when not interrupting
-  initInterrupt0();
+  
+  
+  tmp_state[0] = *myRadio.readRegister(SETUP_RETR, 0);
+  printString("SETUP_RETR: ");
+  printBinaryByte(tmp_state[0]);
+  printString("\r\n");initInterrupt0();
+  
+  tmp_state [0] = 1<<(ARC)|1<<(ARC+1)|1<<(ARC+2)|1<<(ARC+3);
+  myRadio.writeRegister(SETUP_RETR, tmp_state, 1);
+  
   tmp_state[0] = *myRadio.readRegister(CONFIG, 0);
   printString("CONFIG: ");
+  printBinaryByte(tmp_state[0]);
+  printString("\r\n");
+  tmp_state[0] = *myRadio.readRegister(EN_AA, 0);
+  printString("EN_AA: ");
+  printBinaryByte(tmp_state[0]);
+  printString("\r\n");
+  tmp_state[0] = *myRadio.readRegister(SETUP_RETR, 0);
+  printString("SETUP_RETR: ");
   printBinaryByte(tmp_state[0]);
   printString("\r\n");
 }
@@ -161,7 +177,6 @@ int main(void) {
         serialCommand = *(tmpRxData+0);
         serialData    = *(tmpRxData+1);
 		myRadio.clear_interrupts();
-		/*
 		printString("rxDataFLAG set\r\n");
 		printString("serialCommand: ");
 		printBinaryByte(serialCommand);
@@ -169,25 +184,55 @@ int main(void) {
 		printString("serialData: ");
 		printBinaryByte(serialData);
 		printString("\r\n");
-		*/
         // Check Command byte
         if(serialCommand == 0X01) // Read signal and return data to master
         {
           signalVal++; // Dummy signal value for testing
           // Turn Master to transmitter
           myRadio.txMode();
-		  tmp_state[0] = *myRadio.readRegister(CONFIG, 0);
+		  //_delay_ms(200); // Delay to allow for the master to enter itself into receiver mode so it can catch this message
+		  /*tmp_state[0] = *myRadio.readRegister(CONFIG, 0);
 		  printString("CONFIG tx: ");
 		  printBinaryByte(tmp_state[0]);
-		  printString("\r\n");
-          // MISO Command byte for return signal value: 0x02
+		  printString("\r\n"); */
+		  // MISO Command byte for return signal value: 0x02
           //unsigned char tmpData [] = {0x02, signalVal}; // Data needs to be the same size as the fixedDataWidth set in setup
 		  unsigned char tmpData [] = {0x02, 0x01}; // Data needs to be the same size as the fixedDataWidth set in setup
           myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the default address. Change this once the radio is working
           //
+		 
+		  
+		  // Loop until packet is transmitted
+		  uint8_t packetTransmitted = 0;
+		  uint8_t tmpInd = 0;
+		  while(packetTransmitted == 0)
+		  {
+			  tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
+			  packetTransmitted = (tmp_state[0] & (1<<TX_EMPTY));
+			  tmpInd++;
+			  if(tmpInd > 200)
+			  {
+				  printString("Transmission retries maxed out\r\n");
+				  break;
+			  }
+			  _delay_ms(2);
+		  }
+		  
+	 
+		  //_delay_ms(400);
           // Turn Master to receiver
           myRadio.rMode();
-		  printString("Data sent, continue\r\n");
+		  
+		  // Check lost packets
+		  tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
+		  printString("FIFO_STATUS: ");
+		  printBinaryByte(tmp_state[0]);
+		  printString("\r\n");
+		  tmp_state[0] = *myRadio.readRegister(OBSERVE_TX, 0);
+		  printString("OBSERVE_TX: ");
+		  printBinaryByte(tmp_state[0]);
+		  printString("\r\n");
+		  
         }
         /*
         printString("RX Data: \r\n");
@@ -209,7 +254,7 @@ int main(void) {
     }
 	
 
-    _delay_ms(5); // Short delay to keep everything running well. Make sure the IRQ's get cleared before next loop. etc...
+    //_delay_ms(5); // Short delay to keep everything running well. Make sure the IRQ's get cleared before next loop. etc...
 	//_delay_ms(2000); // Short delay to keep everything running well. Make sure the IRQ's get cleared before next loop. etc...
 	
 
@@ -273,10 +318,10 @@ void IRQ_reset_and_respond(void)
 	{
 		printString("TX_FIFO Full\r\n");
 	}
-	if (CHECK_BIT(tmp_state[0],1)|CHECK_BIT(tmp_state[0],2)|CHECK_BIT(tmp_state[0],3)) // TX_FIFO full
-	{
-		printString("Pipe Number Changed\r\n");
-	}
+	//if (CHECK_BIT(tmp_state[0],1)|CHECK_BIT(tmp_state[0],2)|CHECK_BIT(tmp_state[0],3)) // Pipe Numbers
+	//{
+	//	printString("Pipe Number Changed\r\n");
+	//}
 	if CHECK_BIT(tmp_state[0],4) // Maximum number of TX retries interrupt
 	{
 		printString("Max TX retries IRQ\r\n");
@@ -296,7 +341,7 @@ void IRQ_reset_and_respond(void)
 		rxDataFLAG = 1; //Set Rx Data FLAG
 	}
 	
-	//myRadio.clear_interrupts();
+	myRadio.clear_interrupts();
 	IRQ_state = 0; //reset IRQ_state
 	
 }
