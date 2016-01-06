@@ -8,6 +8,7 @@
 #include "ATMEGA-328-pinDefines.h"
 #include "USART.h"
 #include "nRF24L01p.h"
+#include "ds18b20.h"
 
 
 //NRF24L01pClass * myRadio;
@@ -187,7 +188,7 @@ int main(void) {
         // Check Command byte
         if(serialCommand == 0X01) // Read signal and return data to master
         {
-          signalVal++; // Dummy signal value for testing
+          //signalVal++; // Dummy signal value for testing
           // Turn Master to transmitter
           myRadio.txMode();
 		  //_delay_ms(200); // Delay to allow for the master to enter itself into receiver mode so it can catch this message
@@ -197,8 +198,12 @@ int main(void) {
 		  printString("\r\n"); */
 		  // MISO Command byte for return signal value: 0x02
           //unsigned char tmpData [] = {0x02, signalVal}; // Data needs to be the same size as the fixedDataWidth set in setup
-		  unsigned char tmpData [] = {0x02, 0x01}; // Data needs to be the same size as the fixedDataWidth set in setup
-          myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the default address. Change this once the radio is working
+		  
+		  //unsigned char tmpData [] = {0x02, 0x01}; // Data needs to be the same size as the fixedDataWidth set in setup
+          double d = 0;
+		  d = ds18b20_gettemp();
+		  unsigned char tmpData [] = {0x02, (unsigned char)d}; // Data needs to be the same size as the fixedDataWidth set in setup
+		  myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the default address. Change this once the radio is working
           //
 		 
 		  
