@@ -1,5 +1,12 @@
                                             /* SPI ATMEGA radio */
 
+/* This commit
+ *  added PAYLOAD_WIDTH def, removed fixedPayloadWidth
+ *
+ *
+ *
+*/
+
 // ------- Preamble -------- //
 //#define F_CPU 1000000UL // 1 MHz
 #include <avr/io.h>
@@ -14,6 +21,7 @@
 //NRF24L01pClass * myRadio;
 //NRF24L01p * myRadio;
 NRF24L01p myRadio;
+#define PAYLOAD_WIDTH 2
 
 // Interrupt variable
 volatile unsigned char IRQ_state = 0x00;
@@ -41,19 +49,6 @@ void setup(void)
   initUSART();
 	printString("Begin startup\r\n");
 	
-	// Begin SPI communication, initialized in nRF24L01.cpp constructor
-	//initSPImaster();
-	
-	// int airDataRate = 250; //kBps, can be 250, 1000 or 2000 section 6.3.2
-	//int rfChannelFreq = 0x02; // = 2400 + RF_CH(MHz) section 6.3.3 0x02 is the default
-	//  RF_CH can be set from 0-83. Any channel higher than 83 is off limits in US by FCC law
-	//SETUP_AW: AW=11-5 byte address width
-	//myRadio = new NRF24L01pClass;
-	//myRadio = new NRF24L01p(SPI_CE,SPI_CSN);
-	//myRadio.init(SPI_CE,SPI_CSN);
-	//myRadio = new NRF24L01p;
-	//NRF24L01p myRadio;
-
 	// Start radio
 	myRadio.begin();
 	
@@ -61,9 +56,7 @@ void setup(void)
 	//
 	// Use default addresses for now _ CHANGE ADDRESSES HERE IN FUTURE
 	unsigned char pipesOn [] = {0x01}; // which pipes to turn on for receiving
-	//unsigned char fixedPayloadWidth [] = {0x05}; // number of bytes for payload width
-	int fixedPayloadWidth = 2; // number of bytes for payload width
-	myRadio.setup_data_pipes(pipesOn, fixedPayloadWidth);
+	myRadio.setup_data_pipes(pipesOn, PAYLOAD_WIDTH);
 	
 	//DEBUG - change RX_ADDR_P0 to see if I am reading the right value
 	unsigned char tmpArr [] = {0xE7,0xE7,0xE7,0xE7,0xE7};
@@ -220,7 +213,7 @@ int main(void) {
 				  printString("Transmission retries maxed out\r\n");
 				  break;
 			  }
-			  _delay_ms(2);
+			  _delay_ms(10); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
 		  }
 		  
 	 
@@ -295,6 +288,7 @@ ISR(INT0_vect)
 	//printString("IRQ");
 	//IRQ_state = * myRadio.readRegister(STATUS,1); // this returns a pointer, so I dereferenced it to the unsigned char for IRQ_state
 	IRQ_state = 1;
+	//myRadio.clear_interrupts();
 }
 
 
