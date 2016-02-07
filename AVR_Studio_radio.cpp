@@ -1,11 +1,28 @@
                                             /* SPI ATMEGA radio */
 
 /* This commit
- *  added PAYLOAD_WIDTH def, removed fixedPayloadWidth
+ *  cleaned up code, removed comments 2-7-2016 SL
  *
  *
  *
 */
+
+// >> DEBUG >> DEBUG >> DEBUG >> DEBUG >> DEBUG 
+	/*
+	//myRadio.clear_interrupts();
+	tmp_state[0] = *myRadio.readRegister(STATUS, 0);
+	printString("STATUS: ");
+	printBinaryByte(tmp_state[0]);
+	printString("\r\n");
+	*/
+	
+	/*
+	tmp_state[0] = *myRadio.readRegister(CONFIG, 0);
+	printString("CONFIG tx: ");
+	printBinaryByte(tmp_state[0]);
+	printString("\r\n"); 
+	*/
+// >> DEBUG >> DEBUG >> DEBUG >> DEBUG >> DEBUG
 
 // ------- Preamble -------- //
 //#define F_CPU 1000000UL // 1 MHz
@@ -130,21 +147,10 @@ int main(void) {
   // ------ Event loop ------ //
   while (1) {
 	  
-	/*
-	// For DEBUG
-	//myRadio.clear_interrupts();
-	tmp_state[0] = *myRadio.readRegister(STATUS, 0);
-	printString("STATUS: ");
-	printBinaryByte(tmp_state[0]);
-	printString("\r\n");
-	*/
-	
     /* add main program code here */
     int serialCommand = 0; // Serial commands: 0-do nothing
                  //                  1-query radioSlave for data
     int serialData	  = 0; // Data byte
-	
-	
 
     if (IRQ_state == 1)
     {
@@ -157,7 +163,8 @@ int main(void) {
       // Send data
       printString("Transmit code abc go\r\n");
       unsigned char tmpData [] = {1,2,3,4,26}; // Data needs to be the same size as the fixedDataWidth set in setup
-      myRadio.txData(tmpData, 5); // This is currently sending data to pipe 0 at the default address. Change this once the radio is working
+      myRadio.txData(tmpData, 5); // This is currently sending data to pipe 0 at the default address. 
+								  // Change this once the radio is working
       _delay_ms(2000);
     }
     // Radio is in RX mode
@@ -170,33 +177,14 @@ int main(void) {
         unsigned char * tmpRxData = myRadio.rData(2);
         serialCommand = *(tmpRxData+0);
         serialData    = *(tmpRxData+1);
-		myRadio.clear_interrupts();
-		/*
-		printString("rxDataFLAG set\r\n");
-		printString("serialCommand: ");
-		printBinaryByte(serialCommand);
-		printString("\r\n");
-		printString("serialData: ");
-		printBinaryByte(serialData);
-		printString("\r\n");
-		*/
-		
+		//myRadio.clear_interrupts(); // TODO: does this need to be here?
+	
         // Check Command byte
         if(serialCommand == 0X01) // Read signal and return data to master
         {
-          //signalVal++; // Dummy signal value for testing
           // Turn Master to transmitter
           myRadio.txMode();
-		  //_delay_ms(200); // Delay to allow for the master to enter itself into receiver mode so it can catch this message
-		  /*tmp_state[0] = *myRadio.readRegister(CONFIG, 0);
-		  printString("CONFIG tx: ");
-		  printBinaryByte(tmp_state[0]);
-		  printString("\r\n"); */
-		  // MISO Command byte for return signal value: 0x02
-          //unsigned char tmpData [] = {0x02, signalVal}; // Data needs to be the same size as the fixedDataWidth set in setup
 		  
-		  //unsigned char tmpData [] = {0x02, 0x01}; // Data needs to be the same size as the fixedDataWidth set in setup
-          // START HERE: does not work if I comment out these lines and replace with dummy variable, does the radio not have time to enter txMode?
 		  double d = 0;
 		  d = ds18b20_gettemp();
 		  unsigned char tmpData [] = {2, (unsigned char)d}; // Data needs to be the same size as the fixedDataWidth set in setup  
@@ -220,48 +208,17 @@ int main(void) {
 			  _delay_ms(10); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
 		  }
 		  
-	 
-		  //_delay_ms(400);
           // Turn Master to receiver
           myRadio.rMode();
 		  
-		  // Check lost packets
-		  /*
-		  tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
-		  printString("FIFO_STATUS: ");
-		  printBinaryByte(tmp_state[0]);
-		  printString("\r\n");
-		  tmp_state[0] = *myRadio.readRegister(OBSERVE_TX, 0);
-		  printString("OBSERVE_TX: ");
-		  printBinaryByte(tmp_state[0]);
-		  printString("\r\n");
-		  */
-		  
         }
-        /*
-        printString("RX Data: \r\n");
-        for (int x=0; x<2; x++)
-        {
-          printString("Element ");
-          printWord(x);
-          printString(": ");
-          printWord(*(tmpRxData+x));
-          printString("\r\n");
-        }
-        */
-        //myRadio.flushRX();
-        myRadio.flushRX();
+       
+        myRadio.flushRX(); //TODO: does this need to be here?
         rxDataFLAG = 0; // reset rxDataFLAG
       }
       
       
     }
-	
-
-    //_delay_ms(5); // Short delay to keep everything running well. Make sure the IRQ's get cleared before next loop. etc...
-	//_delay_ms(2000); // Short delay to keep everything running well. Make sure the IRQ's get cleared before next loop. etc...
-	
-
 
   }                                                  /* End event loop */
   return (0);                            /* This line is never reached */
@@ -289,12 +246,7 @@ Resolve the attachInterrupt function quickly
 */
 ISR(INT0_vect)
 {
-	// Get the IRQ code from the receiver and assign it to IRQ_state variable
-	//unsigned char * p_tmp;
-	//printString("IRQ");
-	//IRQ_state = * myRadio.readRegister(STATUS,1); // this returns a pointer, so I dereferenced it to the unsigned char for IRQ_state
 	IRQ_state = 1;
-	//myRadio.clear_interrupts();
 }
 
 
@@ -348,18 +300,4 @@ void IRQ_reset_and_respond(void)
 	
 }
 
-/*
-void clear_interrupts(void)
-{
-	// Clear any interrupts
-	unsigned char tmp_state [] = {1<<RX_DR};
-	myRadio.writeRegister(STATUS, tmp_state, 1);
-	tmp_state [0] = 1<<TX_DS;
-	myRadio.writeRegister(STATUS, tmp_state, 1);
-	tmp_state [0] = 1<<MAX_RT;
-	myRadio.writeRegister(STATUS, tmp_state, 1);
-	// Flush the TX register
-	myRadio.flushTX();
-}
-*/
 
