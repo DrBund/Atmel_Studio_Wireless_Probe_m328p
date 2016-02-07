@@ -171,6 +171,7 @@ int main(void) {
         serialCommand = *(tmpRxData+0);
         serialData    = *(tmpRxData+1);
 		myRadio.clear_interrupts();
+		/*
 		printString("rxDataFLAG set\r\n");
 		printString("serialCommand: ");
 		printBinaryByte(serialCommand);
@@ -178,6 +179,8 @@ int main(void) {
 		printString("serialData: ");
 		printBinaryByte(serialData);
 		printString("\r\n");
+		*/
+		
         // Check Command byte
         if(serialCommand == 0X01) // Read signal and return data to master
         {
@@ -193,11 +196,12 @@ int main(void) {
           //unsigned char tmpData [] = {0x02, signalVal}; // Data needs to be the same size as the fixedDataWidth set in setup
 		  
 		  //unsigned char tmpData [] = {0x02, 0x01}; // Data needs to be the same size as the fixedDataWidth set in setup
-          double d = 0;
+          // START HERE: does not work if I comment out these lines and replace with dummy variable, does the radio not have time to enter txMode?
+		  double d = 0;
 		  d = ds18b20_gettemp();
-		  unsigned char tmpData [] = {0x02, (unsigned char)d}; // Data needs to be the same size as the fixedDataWidth set in setup
+		  unsigned char tmpData [] = {2, (unsigned char)d}; // Data needs to be the same size as the fixedDataWidth set in setup  
+		  //unsigned char tmpData [] = {2, 3};
 		  myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the default address. Change this once the radio is working
-          //
 		 
 		  
 		  // Loop until packet is transmitted
@@ -222,6 +226,7 @@ int main(void) {
           myRadio.rMode();
 		  
 		  // Check lost packets
+		  /*
 		  tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
 		  printString("FIFO_STATUS: ");
 		  printBinaryByte(tmp_state[0]);
@@ -230,6 +235,7 @@ int main(void) {
 		  printString("OBSERVE_TX: ");
 		  printBinaryByte(tmp_state[0]);
 		  printString("\r\n");
+		  */
 		  
         }
         /*
@@ -299,19 +305,17 @@ Also resolve the condition which triggered the interrupt
 */
 void IRQ_reset_and_respond(void)
 {
-	printString(" ------------------ RESPOND TO IRQ --------------------- \r\n");
-	//unsigned char tmp_state [] = {0x00};
-		/*
-	unsigned char tmp_status = * myRadio.readRegister(STATUS,1);
-	printString("STATUS: ");
-	printBinaryByte(tmp_status);
-	printString("\r\n");
-	*/
 	
+	
+	//printString(" ------------------ RESPOND TO IRQ --------------------- \r\n");
+
 	tmp_state[0] = *myRadio.readRegister(STATUS, 0);
-	printString("STATUS: ");
-	printBinaryByte(tmp_state[0]);
-	printString("\r\n");
+	//printString("STATUS: ");
+	//printBinaryByte(tmp_state[0]);
+	//printString("\r\n");
+	
+	myRadio.clear_interrupts();
+	IRQ_state = 0; //reset IRQ_state
 	
 	if CHECK_BIT(tmp_state[0],0) // TX_FIFO full
 	{
@@ -332,7 +336,7 @@ void IRQ_reset_and_respond(void)
 	}
 	if CHECK_BIT(tmp_state[0],6) // Data ready RX FIFO interrupt
 	{
-		printString("Data ready RX FIFO IRQ\r\n");
+		//printString("Data ready RX FIFO IRQ\r\n");
 		// Read the data from the R_RX_PAYLOAD
 		// RX_P_NO bits 3:1 tell what pipe number the payload is available in 000-101: Data Pipe Number, 110: Not Used, 111: RX_FIFO Empty
 		// Get bits 3:1 and right shift to get pipe number
@@ -340,8 +344,7 @@ void IRQ_reset_and_respond(void)
 		rxDataFLAG = 1; //Set Rx Data FLAG
 	}
 	
-	myRadio.clear_interrupts();
-	IRQ_state = 0; //reset IRQ_state
+	
 	
 }
 
