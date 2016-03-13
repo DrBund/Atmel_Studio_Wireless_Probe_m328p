@@ -34,11 +34,11 @@
 #include "nRF24L01p.h"
 #include "ds18b20.h"
 
+#define PAYLOAD_WIDTH 3
 
 //NRF24L01pClass * myRadio;
 //NRF24L01p * myRadio;
 NRF24L01p myRadio;
-#define PAYLOAD_WIDTH 2
 
 // Interrupt variable
 volatile unsigned char IRQ_state = 0x00;
@@ -58,14 +58,79 @@ unsigned char tmp_state [] = {0x00};
 // void clear_interrupts(void);
 void initInterrupt0(void);
 void IRQ_reset_and_respond(void);
+void initADC1(void);
+uint16_t readADC(uint8_t channel);
+void radio_tx_word(uint8_t serialCommand, uint16_t txWord);
 // Function declerations <<  Function declerations << Function declerations
+
+// SENSORS >> SENSORS >> SENSORS >> SENSORS >> SENSORS  
+//    Add sensor values here for DS18B20
+//
+//    Soil moisture sensor
+//      Defined in ATMEGA-328-pinDefines.h as MOIST_SENSOR
+//      Currently on pin PC1 / ADC1
+//
+// SENSORS << SENSORS << SENSORS << SENSORS << SENSORS  
+
+void initADC1()
+{
+  ADMUX |= (1 << REFS0);                     /* reference voltage on AVCC */
+  ADCSRA |= (1 << ADPS1) | (1 << ADPS0);        /* ADC clock prescaler /8 */
+  ADCSRA |= (1 << ADEN);                                    /* enable ADC */
+  printString("ADC1 initialized\r\n");
+}
+
+uint16_t readADC(uint8_t channel)
+{
+  ADMUX = (0xf0 & ADMUX) | channel;                     /* select ADC pin */
+  ADCSRA |= (1 << ADSC);                          /* start ADC conversion */
+  loop_until_bit_is_clear(ADCSRA, ADSC);               /* loop until done */
+  return (ADC);
+}
+
+void radio_tx_word(uint8_t serialCommand, uint16_t txWord)
+{
+  // SL_1 changed uintLSB and uintMSB from uint8_t to unsigned char
+  unsigned char uintLSB = 0;
+  unsigned char uintMSB = 0;
+
+  // Bit shift data out of word and into u char
+  uintLSB = (txWord & 0b11111111);
+  txWord = (txWord >> 8);
+  uintMSB = (txWord & 0b11111111);
+
+  //unsigned char tmpData [] = {serialCommand, uintMSB, uintLSB}; /* Data needs to be the 
+  //                                                  same size as the 
+  //                                                  fixedDataWidth set in 
+  //                                                  setup */
+  
+  unsigned char tmpData [] = {0x02, 0x03, 0x04};
+	  
+  printString("transmit data from within radio_tx_word \r\n");
+  myRadio.txData(tmpData, PAYLOAD_WIDTH);             /* This is currently sending data 
+                                                      to pipe 0 at the default address. 
+                                               Change this once the radio is working */
+}
 
 void setup(void)
 {
 	/* add setup code here */
   initUSART();
 	printString("Begin startup\r\n");
-	
+
+	// Begin SPI communication, initialized in nRF24L01.cpp constructor
+	//initSPImaster();
+  //
+	// int airDataRate = 250; //kBps, can be 250, 1000 or 2000 section 6.3.2
+	//int rfChannelFreq = 0x02; // = 2400 + RF_CH(MHz) section 6.3.3 0x02 is the default
+	//  RF_CH can be set from 0-83. Any channel higher than 83 is off limits in US by FCC law
+	//SETUP_AW: AW=11-5 byte address width
+	//myRadio = new NRF24L01pClass;
+	//myRadio = new NRF24L01p(SPI_CE,SPI_CSN);
+	//myRadio.init(SPI_CE,SPI_CSN);
+	//myRadio = new NRF24L01p;
+	//NRF24L01p myRadio;
+
 	// Start radio
 	myRadio.begin();
 	
@@ -113,7 +178,9 @@ void setup(void)
   tmp_state[0] = *myRadio.readRegister(SETUP_RETR, 0);
   printString("SETUP_RETR: ");
   printBinaryByte(tmp_state[0]);
-  printString("\r\n");initInterrupt0();
+  printString("\r\n");
+  
+  initInterrupt0();
   
   tmp_state [0] = 1<<(ARC)|1<<(ARC+1)|1<<(ARC+2)|1<<(ARC+3);
   myRadio.writeRegister(SETUP_RETR, tmp_state, 1);
@@ -143,14 +210,29 @@ int main(void) {
 
   // -------- Inits --------- //
   setup();
-  
+  uint16_t adcValue;                   /* hold value for ADC */
+  initADC1();                          /* initialize the ADC */
+
   // ------ Event loop ------ //
   while (1) {
 	  
+	/*
+	// For DEBUG
+	//myRadio.clear_interrupts();
+	tmp_state[0] = *myRadio.readRegister(STATUS, 0);
+	printString("STATUS: ");
+	printBinaryByte(tmp_state[0]);
+	printString("\r\n");
+	*/
+	
     /* add main program code here */
-    int serialCommand = 0; // Serial commands: 0-do nothing
+    // SL_1 - changed serialCommand and serialData from int to uchar
+    unsigned char serialCommand = 0; // Serial commands: 0-do nothing
                  //                  1-query radioSlave for data
-    int serialData	  = 0; // Data byte
+    unsigned char serialData1	  = 0; // Data byte
+    unsigned char serialData2	  = 0; // Data byte
+	
+	
 
     if (IRQ_state == 1)
     {
@@ -162,8 +244,8 @@ int main(void) {
     {
       // Send data
       printString("Transmit code abc go\r\n");
-      unsigned char tmpData [] = {1,2,3,4,26}; // Data needs to be the same size as the fixedDataWidth set in setup
-      myRadio.txData(tmpData, 5); // This is currently sending data to pipe 0 at the default address. 
+      unsigned char tmpData [] = {1,2,3}; // Data needs to be the same size as the fixedDataWidth set in setup
+      myRadio.txData(tmpData, PAYLOAD_WIDTH); // This is currently sending data to pipe 0 at the default address. 
 								  // Change this once the radio is working
       _delay_ms(2000);
     }
@@ -174,23 +256,42 @@ int main(void) {
       if (rxDataFLAG == 1)
       {
         // Receive data and print
-        unsigned char * tmpRxData = myRadio.rData(2);
+        unsigned char * tmpRxData = myRadio.rData(PAYLOAD_WIDTH);
         serialCommand = *(tmpRxData+0);
-        serialData    = *(tmpRxData+1);
+        serialData1   = *(tmpRxData+1);
+        serialData2   = *(tmpRxData+2);
 		//myRadio.clear_interrupts(); // TODO: does this need to be here?
-	
+	      /* DEBUG - do not leave on during operation
+          printString("serialCommand: ");
+          printBinaryByte(serialCommand);
+          printString("\r\n");
+          printString("serialData1: ");
+          printBinaryByte(serialData1);
+          printString("\r\n");
+		      printString("serialData2: ");
+		      printBinaryByte(serialData2);
+		      printString("\r\n");
+        */
         // Check Command byte
         if(serialCommand == 0X01) // Read signal and return data to master
         {
           // Turn Master to transmitter
           myRadio.txMode();
-		  
-		  double d = 0;
-		  d = ds18b20_gettemp();
-		  unsigned char tmpData [] = {2, (unsigned char)d}; // Data needs to be the same size as the fixedDataWidth set in setup  
-		  //unsigned char tmpData [] = {2, 3};
-		  myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the default address. Change this once the radio is working
+          
+          double d = 0;
+          d = ds18b20_gettemp();
+          unsigned char tmpData [] = {2, (unsigned char)d}; // Data needs to be the 
+                                                            // same size as the 
+                                                            // fixedDataWidth set in setup  
+          //unsigned char tmpData [] = {2, 3};
+          myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the 
+                                      // default address. Change this once the 
+                                      // radio is working
 		 
+          /* Read moisture meater
+          adcValue = readADC(MOIST_SENSOR); 
+          radio_tx_word(adcValue)
+		      */
 		  
 		  // Loop until packet is transmitted
 		  uint8_t packetTransmitted = 0;
