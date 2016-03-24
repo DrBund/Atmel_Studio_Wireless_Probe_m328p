@@ -247,7 +247,7 @@ int main(void) {
       unsigned char tmpData [] = {1,2,3}; // Data needs to be the same size as the fixedDataWidth set in setup
       myRadio.txData(tmpData, PAYLOAD_WIDTH); // This is currently sending data to pipe 0 at the default address. 
 								  // Change this once the radio is working
-      _delay_ms(2000);
+      //_delay_ms(2000);
     }
     // Radio is in RX mode
     // Receive transmission from master
@@ -280,11 +280,11 @@ int main(void) {
           
           double d = 0;
           d = ds18b20_gettemp();
-          unsigned char tmpData [] = {2, (unsigned char)d}; // Data needs to be the 
+          unsigned char tmpData [] = {2, (unsigned char)d,3}; // Data needs to be the 
                                                             // same size as the 
                                                             // fixedDataWidth set in setup  
           //unsigned char tmpData [] = {2, 3};
-          myRadio.txData(tmpData, 2); // This is currently sending data to pipe 0 at the 
+          myRadio.txData(tmpData, PAYLOAD_WIDTH); // This is currently sending data to pipe 0 at the 
                                       // default address. Change this once the 
                                       // radio is working
 		 
@@ -301,12 +301,12 @@ int main(void) {
 			  tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
 			  packetTransmitted = (tmp_state[0] & (1<<TX_EMPTY));
 			  tmpInd++;
-			  if(tmpInd > 200)
+			  if(tmpInd > 10)
 			  {
 				  printString("Transmission retries maxed out\r\n");
 				  break;
 			  }
-			  _delay_ms(10); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
+			  _delay_ms(100); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
 		  }
 		  
           // Turn Master to receiver
@@ -385,7 +385,7 @@ void IRQ_reset_and_respond(void)
 	}
 	if CHECK_BIT(tmp_state[0],5) // Data sent TX FIFO interrupt
 	{
-		printString("Data Sent TX FIFO IRQ\r\n");
+		//printString("Data Sent TX FIFO IRQ\r\n");
 	}
 	if CHECK_BIT(tmp_state[0],6) // Data ready RX FIFO interrupt
 	{
