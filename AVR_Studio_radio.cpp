@@ -104,7 +104,7 @@ void radio_tx_double(uint8_t serialCommand, uint16_t txWord)
   //                                                  fixedDataWidth set in 
   //                                                  setup */
   
-  unsigned char tmpData [] = {0x02, uintLSB, uintMSB};
+  unsigned char tmpData [] = {serialCommand, uintLSB, uintMSB};
 	  
   //printString("transmit data from within radio_tx_double \r\n");
   myRadio.txData(tmpData, PAYLOAD_WIDTH);             /* This is currently sending data 
@@ -272,7 +272,14 @@ int main(void) {
 		      printBinaryByte(serialData2);
 		      printString("\r\n");
         */
+
+
+
+
         // Check Command byte
+        // --------------------------------------------------------------
+        // Send DS18B20 temperature value
+        // --------------------------------------------------------------
         if(serialCommand == 0X01) // Read signal and return data to master
         {
           // Turn Master to transmitter
@@ -295,23 +302,65 @@ int main(void) {
           adcValue = readADC(MOIST_SENSOR); 
           radio_tx_double(adcValue)
 		      */
+          
+          // Loop until packet is transmitted
+          uint8_t packetTransmitted = 0;
+          uint8_t tmpInd = 0;
+          while(packetTransmitted == 0)
+          {
+            tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
+            packetTransmitted = (tmp_state[0] & (1<<TX_EMPTY));
+            tmpInd++;
+            if(tmpInd > 10)
+            {
+              printString("Transmission retries maxed out\r\n");
+              break;
+            }
+            _delay_ms(100); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
+          }
+          
+          // Turn Master to receiver
+          myRadio.rMode();
 		  
-		  // Loop until packet is transmitted
-		  uint8_t packetTransmitted = 0;
-		  uint8_t tmpInd = 0;
-		  while(packetTransmitted == 0)
-		  {
-			  tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
-			  packetTransmitted = (tmp_state[0] & (1<<TX_EMPTY));
-			  tmpInd++;
-			  if(tmpInd > 10)
-			  {
-				  printString("Transmission retries maxed out\r\n");
-				  break;
-			  }
-			  _delay_ms(100); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
-		  }
+        }
+        
+
+
+        // --------------------------------------------------------------
+        // Send ADC value
+        // --------------------------------------------------------------
+        if(serialCommand == 0X03) // Read signal and return data to master
+        {
+          // Turn Master to transmitter
+          myRadio.txMode();
+          
+          // Read moisture meater
+		  printString("Read ADC: ");
+          adcValue = readADC(MOIST_SENSOR); 
+		  printWord(adcValue);
+		  printString("\r\n");
+		  //_delay_ms(200);
+          radio_tx_double(0x04, adcValue);
 		  
+		  _delay_ms(400);
+		  // TODO START HERE this loop is the problem, use the interrupts instead of this loop to check that the packet was sent or timed out.
+		  //      you should not need any delays previous to this 
+          // Loop until packet is transmitted
+          uint8_t packetTransmitted = 0;
+          uint8_t tmpInd = 0;
+          while(packetTransmitted == 0)
+          {
+            tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
+            packetTransmitted = (tmp_state[0] & (1<<TX_EMPTY));
+            tmpInd++;
+            if(tmpInd > 5)
+            {
+              printString("Transmission retries maxed out\r\n");
+              break;
+            }
+            _delay_ms(200); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
+          }
+          
           // Turn Master to receiver
           myRadio.rMode();
 		  

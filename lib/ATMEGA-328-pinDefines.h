@@ -1,3 +1,4 @@
+
 // ---------------
 //   Pin Defines
 // ---------------
@@ -43,10 +44,10 @@
 #define LIGHT_SENSOR_PIN        PINC
 #define LIGHT_SENSOR_DDR        DDRC
 
-#define CAP_SENSOR              PC1                            /* ADC1 */
-#define CAP_SENSOR_PORT         PORTC
-#define CAP_SENSOR_PIN          PINC
-#define CAP_SENSOR_DDR          DDRC
+#define MOIST_SENSOR            PC1                            /* ADC1 */
+#define MOIST_SENSOR_PORT       PORTC
+#define MOIST_SENSOR_PIN        PINC
+#define MOIST_SENSOR_DDR        DDRC
 
 #define PIEZO                   PC2                            /* ADC2 */
 #define PIEZO_PORT              PORTC
