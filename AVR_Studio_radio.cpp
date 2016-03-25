@@ -60,7 +60,7 @@ void initInterrupt0(void);
 void IRQ_reset_and_respond(void);
 void initADC1(void);
 uint16_t readADC(uint8_t channel);
-void radio_tx_word(uint8_t serialCommand, uint16_t txWord);
+void radio_tx_double(uint8_t serialCommand, uint16_t txWord);
 // Function declerations <<  Function declerations << Function declerations
 
 // SENSORS >> SENSORS >> SENSORS >> SENSORS >> SENSORS  
@@ -88,7 +88,7 @@ uint16_t readADC(uint8_t channel)
   return (ADC);
 }
 
-void radio_tx_word(uint8_t serialCommand, uint16_t txWord)
+void radio_tx_double(uint8_t serialCommand, uint16_t txWord)
 {
   // SL_1 changed uintLSB and uintMSB from uint8_t to unsigned char
   unsigned char uintLSB = 0;
@@ -104,9 +104,9 @@ void radio_tx_word(uint8_t serialCommand, uint16_t txWord)
   //                                                  fixedDataWidth set in 
   //                                                  setup */
   
-  unsigned char tmpData [] = {0x02, 0x03, 0x04};
+  unsigned char tmpData [] = {0x02, uintLSB, uintMSB};
 	  
-  printString("transmit data from within radio_tx_word \r\n");
+  //printString("transmit data from within radio_tx_double \r\n");
   myRadio.txData(tmpData, PAYLOAD_WIDTH);             /* This is currently sending data 
                                                       to pipe 0 at the default address. 
                                                Change this once the radio is working */
@@ -280,17 +280,20 @@ int main(void) {
           
           double d = 0;
           d = ds18b20_gettemp();
-          unsigned char tmpData [] = {2, (unsigned char)d,3}; // Data needs to be the 
+
+          //unsigned char tmpData [] = {2, (unsigned char)d,3}; // Data needs to be the 
                                                             // same size as the 
                                                             // fixedDataWidth set in setup  
-          //unsigned char tmpData [] = {2, 3};
-          myRadio.txData(tmpData, PAYLOAD_WIDTH); // This is currently sending data to pipe 0 at the 
+                                                            //
+          //myRadio.txData(tmpData, PAYLOAD_WIDTH); // This is currently sending data to pipe 0 at the 
+          
+          radio_tx_double(0x02, d); // This is currently sending data to pipe 0 at the 
                                       // default address. Change this once the 
                                       // radio is working
 		 
           /* Read moisture meater
           adcValue = readADC(MOIST_SENSOR); 
-          radio_tx_word(adcValue)
+          radio_tx_double(adcValue)
 		      */
 		  
 		  // Loop until packet is transmitted
