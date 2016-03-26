@@ -41,7 +41,9 @@
 NRF24L01p myRadio;
 
 // Interrupt variable
-volatile unsigned char IRQ_state = 0x00;
+volatile unsigned char rxDataFLAG = 0; // Indicates that there is data in the RX FIFO buffer
+volatile unsigned char tx_DS_FLAG = 0; // Data sent TX FIFO interrupt
+volatile unsigned char max_RT_FLAG = 0; // Max retries interrupt
 
 // Used to check the status of a given bit in a variable
 #define CHECK_BIT(var,pos) ((var & (1 << pos)) == (1 << pos))
@@ -49,7 +51,6 @@ volatile unsigned char IRQ_state = 0x00;
 // GLOBALS >> GLOBALS  >> GLOBALS  >> GLOBALS  >> GLOBALS 
 // Set if the radio is transmitter (TX) or receiver (RX)
 int radioMode = 1; // radioMode = 1 for RX, 0 for TX
-int rxDataFLAG = 0; // Indicates that there is data in the RX FIFO buffer
 unsigned char signalVal = 0x05; // Dummy signal value for testing
 unsigned char tmp_state [] = {0x00};
 // GLOBALS << GLOBALS  << GLOBALS  << GLOBALS  << GLOBALS 
@@ -234,11 +235,6 @@ int main(void) {
 	
 	
 
-    if (IRQ_state == 1)
-    {
-      IRQ_reset_and_respond();
-    }
-    
     // Radio is in TX mode
     if (radioMode == 0) 
     {
@@ -313,14 +309,16 @@ int main(void) {
             tmpInd++;
             if(tmpInd > 10)
             {
-              printString("Transmission retries maxed out\r\n");
+              printString("Transmission retries maxed out temp\r\n");
               break;
             }
-            _delay_ms(100); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
+            _delay_ms(200); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
           }
           
           // Turn Master to receiver
+		  tx_DS_FLAG = 0;
           myRadio.rMode();
+		  
 		  
         }
         
@@ -334,34 +332,45 @@ int main(void) {
           // Turn Master to transmitter
           myRadio.txMode();
           
-          // Read moisture meater
-		  printString("Read ADC: ");
+          // Read moisture meter
+          printString("Read ADC: ");
           adcValue = readADC(MOIST_SENSOR); 
-		  printWord(adcValue);
-		  printString("\r\n");
-		  //_delay_ms(200);
+          printWord(adcValue);
+          printString("\r\n");
+
           radio_tx_double(0x04, adcValue);
-		  
-		  _delay_ms(400);
-		  // TODO START HERE this loop is the problem, use the interrupts instead of this loop to check that the packet was sent or timed out.
-		  //      you should not need any delays previous to this 
+         
           // Loop until packet is transmitted
+		  //   Transmission usually takes ~800-1000us for a double
+		  //   myRadio.readRegister has to be polled for transmission to go through
+		  //   not sure why this is, it can be any register, not just STATUS
+		  //   FIFO_STATUS register is used here to monitor if the packet has been sent.
+		  //   The register must also be polled at intervals in the 100's of microseconds
+		  //   You can't just poll the register 10x in a loop with a 10us delay and carry on.
           uint8_t packetTransmitted = 0;
           uint8_t tmpInd = 0;
           while(packetTransmitted == 0)
           {
-            tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
+            //printString("tmpInd: ");
+            //printByte(tmpInd);
+            //printString("\r\n");
+			
+			tmp_state[0] = *myRadio.readRegister(FIFO_STATUS, 0);
             packetTransmitted = (tmp_state[0] & (1<<TX_EMPTY));
+			
             tmpInd++;
-            if(tmpInd > 5)
+            if(tmpInd > 100)
             {
-              printString("Transmission retries maxed out\r\n");
+              printString("Transmission retries maxed out ADC\r\n");
               break;
             }
             _delay_ms(200); // If this is set to <=2ms the radio does not work very well (Start Here, look into retransmit without loop?)
           }
+		  
+		  
           
           // Turn Master to receiver
+		  tx_DS_FLAG = 0;
           myRadio.rMode();
 		  
         }
@@ -399,19 +408,6 @@ Resolve the attachInterrupt function quickly
 */
 ISR(INT0_vect)
 {
-	IRQ_state = 1;
-}
-
-
-
-/* IRQ_reset_and_respond
-Reset the IRQ in the radio STATUS register
-Also resolve the condition which triggered the interrupt
-*/
-void IRQ_reset_and_respond(void)
-{
-	
-	
 	//printString(" ------------------ RESPOND TO IRQ --------------------- \r\n");
 
 	tmp_state[0] = *myRadio.readRegister(STATUS, 0);
@@ -420,7 +416,6 @@ void IRQ_reset_and_respond(void)
 	//printString("\r\n");
 	
 	myRadio.clear_interrupts();
-	IRQ_state = 0; //reset IRQ_state
 	
 	if CHECK_BIT(tmp_state[0],0) // TX_FIFO full
 	{
@@ -432,12 +427,14 @@ void IRQ_reset_and_respond(void)
 	//}
 	if CHECK_BIT(tmp_state[0],4) // Maximum number of TX retries interrupt
 	{
+		max_RT_FLAG = 1;
 		printString("Max TX retries IRQ\r\n");
 		myRadio.flushTX();
 	}
 	if CHECK_BIT(tmp_state[0],5) // Data sent TX FIFO interrupt
 	{
-		//printString("Data Sent TX FIFO IRQ\r\n");
+		tx_DS_FLAG = 1;
+		printString("Data Sent TX FIFO IRQ\r\n");
 	}
 	if CHECK_BIT(tmp_state[0],6) // Data ready RX FIFO interrupt
 	{
