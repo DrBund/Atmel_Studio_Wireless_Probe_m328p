@@ -280,7 +280,7 @@ void NRF24L01p::txData(unsigned char DATA [], int BYTE_NUM)
 	}
 	//digitalWrite(csn_pin, HIGH);
 	SPI_CSN_PORT |= (1 << SPI_CSN);                       /* Write CSN pin HIGH */
-	_delay_ms(2); 
+	//_delay_ms(2); 
 	// When sending packets, the CE pin (which is normally held low in TX operation) is set to high for a minimum of 10us to send the packet.
 	//digitalWrite(ce_pin, HIGH);
 	SPI_CE_PORT |= (1 << SPI_CE);                          /* Write CE pin HIGH */

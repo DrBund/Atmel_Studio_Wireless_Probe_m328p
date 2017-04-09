@@ -281,8 +281,12 @@ int main(void) {
           // Turn Master to transmitter
           myRadio.txMode();
           
-          double d = 0;
+          printString("Read Temperature Sensor: ");
+          uint16_t d = 0;
           d = ds18b20_gettemp();
+          printWord(d);
+          printString("\r\n");
+
 
           //unsigned char tmpData [] = {2, (unsigned char)d,3}; // Data needs to be the 
                                                             // same size as the 
